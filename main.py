@@ -26,7 +26,7 @@ num_features = 8
 num_output = 2
 
 
-def get_data(code):
+def get_data(code, net):
     df = fdr.DataReader(code, '2016-01-01')
     df.columns = df.columns.str.lower()
     df = df.drop(columns=['change'])
@@ -52,40 +52,82 @@ def get_data(code):
         y_val = [1, 0] if y_val <= 0 else [0, 1]
         y_values.append(y_val)
 
-    x_values = np.array(x_values).reshape(-1, num_steps, num_features)
+    if net == 'dnn' or net == 'lstm':
+        x_values = np.array(x_values).reshape(-1, num_steps, num_features)
+    else:
+        x_values = np.array(x_values).reshape(-1, num_steps, num_features, 1)
     y_values = np.array(y_values).reshape(-1, num_output)
     return x_values, y_values
 
 
-x_train, y_train = get_data('005930')
-x_val, y_val = get_data('105560')
-x_test, y_test = get_data('122630')
+net = 'cnn'
 
-model = tf.keras.models.Sequential([
-    tf.keras.layers.Flatten(input_shape=(num_steps, num_features)),
-    tf.keras.layers.Dense(128, activation='tanh'),
-    tf.keras.layers.Dropout(0.1),
-    tf.keras.layers.Dense(64, activation='tanh'),
-    tf.keras.layers.Dropout(0.1),
-    tf.keras.layers.Dense(32, activation='tanh'),
-    tf.keras.layers.Dropout(0.1),
-    tf.keras.layers.Dense(16, activation='tanh'),
-    tf.keras.layers.Dropout(0.1),
-    tf.keras.layers.Dense(num_output, activation='linear')
-])
+x_train, y_train = get_data('005930', net)
+x_val, y_val = get_data('105560', net)
+x_test, y_test = get_data('122630', net)
 
-model.compile(optimizer='adam', loss=tf.losses.mean_squared_error,
+if net == 'dnn':
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Flatten(input_shape=(num_steps, num_features)),
+        tf.keras.layers.Dense(128, activation='tanh'),
+        tf.keras.layers.Dropout(0.1),
+        tf.keras.layers.Dense(64, activation='tanh'),
+        tf.keras.layers.Dropout(0.1),
+        tf.keras.layers.Dense(32, activation='tanh'),
+        tf.keras.layers.Dropout(0.1),
+        tf.keras.layers.Dense(16, activation='tanh'),
+        tf.keras.layers.Dropout(0.1),
+        tf.keras.layers.Dense(num_output, activation='sigmoid')
+    ])
+elif net == 'lstm':
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.LSTM(128, input_shape=(num_steps, num_features), dropout=0.1,
+                             return_sequences=True, stateful=False, activation='tanh'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.LSTM(
+            128, dropout=0.1, return_sequences=True, stateful=False, activation='tanh'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.LSTM(
+            128, dropout=0.1, return_sequences=True, stateful=False, activation='tanh'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.LSTM(
+            128, dropout=0.1, return_sequences=False, stateful=False, activation='tanh'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.Dense(num_output, activation='sigmoid')
+    ])
+else:  # cnn
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Conv2D(128, (3, 3), padding='same', activation='sigmoid',
+            input_shape=(num_steps, num_features, 1)),
+        tf.keras.layers.MaxPooling2D((2, 2)),
+        tf.keras.layers.Conv2D(
+            64, (3, 3), padding='same', activation='sigmoid'),
+        tf.keras.layers.MaxPooling2D((2, 2)),
+        tf.keras.layers.Conv2D(
+            32, (3, 3), padding='same', activation='sigmoid'),
+        tf.keras.layers.MaxPooling2D((2, 2)),
+        tf.keras.layers.Conv2D(
+            16, (3, 3), padding='same', activation='sigmoid'),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(num_output, activation='sigmoid')
+    ])
+
+model.compile(optimizer='adam', loss=tf.losses.binary_crossentropy,
               metrics=['accuracy'])
 
 history = model.fit(x_train, y_train, batch_size=32,
                     epochs=1000, validation_data=(x_val, y_val))
 
-model.evaluate(x_test,  y_test, verbose=2)
+model.evaluate(x_test, y_test, verbose=2)
 
 count = 0
 
 for i in range(20):
-    pred = model.predict(x_test[i].reshape(-1, num_steps, num_features))
+    if net == 'dnn' or net == 'lstm':
+        x_test_value = x_test[i].reshape(-1, num_steps, num_features)
+    else:
+        x_test_value = x_test[i].reshape(-1, num_steps, num_features, 1)
+    pred = model.predict(x_test_value)
 
     p = np.argmax(pred)
     y = np.argmax(y_test[i])

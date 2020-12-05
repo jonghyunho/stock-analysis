@@ -122,6 +122,8 @@ print(model.summary())
 history = model.fit(x_train, y_train, batch_size=32,
                     epochs=1000, validation_data=(x_val, y_val))
 
+model.save('./train/model.h5')
+
 model.evaluate(x_test, y_test, verbose=2)
 
 count = 0

@@ -68,63 +68,79 @@ x_train, y_train = get_data('005930', net)
 x_val, y_val = get_data('105560', net)
 x_test, y_test = get_data('122630', net)
 
-if net == 'dnn':
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.Flatten(input_shape=(num_steps, num_features)),
-        tf.keras.layers.Dense(128, activation='tanh'),
-        tf.keras.layers.Dropout(0.1),
-        tf.keras.layers.Dense(64, activation='tanh'),
-        tf.keras.layers.Dropout(0.1),
-        tf.keras.layers.Dense(32, activation='tanh'),
-        tf.keras.layers.Dropout(0.1),
-        tf.keras.layers.Dense(16, activation='tanh'),
-        tf.keras.layers.Dropout(0.1),
-        tf.keras.layers.Dense(num_output, activation='sigmoid')
-    ])
-elif net == 'lstm':
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.LSTM(128, input_shape=(num_steps, num_features), dropout=0.1,
-                             return_sequences=True, stateful=False, activation='tanh'),
-        tf.keras.layers.BatchNormalization(),
-        tf.keras.layers.LSTM(
-            128, dropout=0.1, return_sequences=True, stateful=False, activation='tanh'),
-        tf.keras.layers.BatchNormalization(),
-        tf.keras.layers.LSTM(
-            128, dropout=0.1, return_sequences=True, stateful=False, activation='tanh'),
-        tf.keras.layers.BatchNormalization(),
-        tf.keras.layers.LSTM(
-            128, dropout=0.1, return_sequences=False, stateful=False, activation='tanh'),
-        tf.keras.layers.BatchNormalization(),
-        tf.keras.layers.Dense(num_output, activation='sigmoid')
-    ])
-else:  # cnn
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.Conv2D(128, (3, 3), padding='same', activation='sigmoid',
-            input_shape=(num_steps, num_features, 1)),
-        tf.keras.layers.MaxPooling2D((2, 2)),
-        tf.keras.layers.Conv2D(
-            64, (3, 3), padding='same', activation='sigmoid'),
-        tf.keras.layers.MaxPooling2D((2, 2)),
-        tf.keras.layers.Conv2D(
-            32, (3, 3), padding='same', activation='sigmoid'),
-        tf.keras.layers.MaxPooling2D((2, 2)),
-        tf.keras.layers.Conv2D(
-            16, (3, 3), padding='same', activation='sigmoid'),
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(num_output, activation='sigmoid')
-    ])
+is_training = False
 
-model.compile(optimizer='adam', loss=tf.losses.binary_crossentropy,
-              metrics=['accuracy'])
+model_path = './train/model.h5'
 
-print(model.summary())
+if is_training is True:
+    if net == 'dnn':
+        model = tf.keras.models.Sequential([
+            tf.keras.layers.Flatten(input_shape=(num_steps, num_features)),
+            tf.keras.layers.Dense(128, activation='tanh'),
+            tf.keras.layers.Dropout(0.1),
+            tf.keras.layers.Dense(64, activation='tanh'),
+            tf.keras.layers.Dropout(0.1),
+            tf.keras.layers.Dense(32, activation='tanh'),
+            tf.keras.layers.Dropout(0.1),
+            tf.keras.layers.Dense(16, activation='tanh'),
+            tf.keras.layers.Dropout(0.1),
+            tf.keras.layers.Dense(num_output, activation='sigmoid')
+        ])
+    elif net == 'lstm':
+        model = tf.keras.models.Sequential([
+            tf.keras.layers.LSTM(128, input_shape=(num_steps, num_features), dropout=0.1,
+                                return_sequences=True, stateful=False, activation='tanh'),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.LSTM(
+                128, dropout=0.1, return_sequences=True, stateful=False, activation='tanh'),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.LSTM(
+                128, dropout=0.1, return_sequences=True, stateful=False, activation='tanh'),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.LSTM(
+                128, dropout=0.1, return_sequences=False, stateful=False, activation='tanh'),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.Dense(num_output, activation='sigmoid')
+        ])
+    else:  # cnn
+        model = tf.keras.models.Sequential([
+            tf.keras.layers.Conv2D(128, (3, 3), padding='same', activation='sigmoid',
+                input_shape=(num_steps, num_features, 1)),
+            tf.keras.layers.MaxPooling2D((2, 2)),
+            tf.keras.layers.Conv2D(
+                64, (3, 3), padding='same', activation='sigmoid'),
+            tf.keras.layers.MaxPooling2D((2, 2)),
+            tf.keras.layers.Conv2D(
+                32, (3, 3), padding='same', activation='sigmoid'),
+            tf.keras.layers.MaxPooling2D((2, 2)),
+            tf.keras.layers.Conv2D(
+                16, (3, 3), padding='same', activation='sigmoid'),
+            tf.keras.layers.Flatten(),
+            tf.keras.layers.Dense(num_output, activation='sigmoid')
+        ])
 
-history = model.fit(x_train, y_train, batch_size=32,
-                    epochs=1000, validation_data=(x_val, y_val))
+    model.compile(optimizer='adam', loss=tf.losses.binary_crossentropy,
+                metrics=['accuracy'])
 
-model.save('./train/model.h5')
+    print(model.summary())
 
-model.evaluate(x_test, y_test, verbose=2)
+    history = model.fit(x_train, y_train, batch_size=32,
+                        epochs=1000, validation_data=(x_val, y_val))
+
+    model.save(model_path)
+else:
+    model = tf.keras.models.load_model(model_path)
+
+    print(model.summary())
+
+    codes = ['207940', '035720', '105560', '139480', '032830', '035420']
+    for code in codes:
+        x_test, y_test = get_data(code, net)
+
+        print(f'[{code}]')
+        model.evaluate(x_test, y_test, verbose=2)
+
+exit()
 
 count = 0
 

@@ -51,7 +51,7 @@ def get_data(code, net):
     for i in range(num_steps, len(x)):
         x_values.append([x.iloc[i-num_steps: i].values])
 
-        y_val = x['close'][i]
+        y_val = x['ma20'][i]
         y_val = [1, 0] if y_val <= 0 else [0, 1]
         y_values.append(y_val)
 

@@ -22,7 +22,7 @@ def get_RSI(df, period):
 
 
 num_steps = 10
-num_features = 8
+num_features = 10
 num_output = 2
 
 
@@ -35,12 +35,15 @@ def get_data(code, net):
 
     x = np.log(1 + df.pct_change()).copy()
     for period in [5, 10, 20, 60, 120]:
-        x[f'ma{period}'] = talib.SMA(
-            df['close'], timeperiod=period) / df['close'] - 1.0
+        x[f'ma{period}'] = df['close'] / \
+            talib.SMA(df['close'], timeperiod=period) - 1.0
 
     x['rsi'] = get_RSI(df, 14) * 0.01
     x['rsi_signal'] = get_RSI(df, 9) * 0.01
 
+    upper, _, low = talib.BBANDS(df['close'], timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
+    x['bb_upper'] = df['close'] / upper - 1.0
+    x['bb_low'] = df['close'] / low - 1.0
     x = x.dropna()
 
     x_values = []
@@ -58,7 +61,6 @@ def get_data(code, net):
         x_values = np.array(x_values).reshape(-1, num_steps, num_features, 1)
     y_values = np.array(y_values).reshape(-1, num_output)
     return x_values, y_values
-
 
 net = 'cnn'
 
@@ -115,6 +117,8 @@ else:  # cnn
 model.compile(optimizer='adam', loss=tf.losses.binary_crossentropy,
               metrics=['accuracy'])
 
+print(model.summary())
+
 history = model.fit(x_train, y_train, batch_size=32,
                     epochs=1000, validation_data=(x_val, y_val))
 
@@ -122,7 +126,9 @@ model.evaluate(x_test, y_test, verbose=2)
 
 count = 0
 
-for i in range(20):
+num_total = 20
+
+for i in range(num_total):
     if net == 'dnn' or net == 'lstm':
         x_test_value = x_test[i].reshape(-1, num_steps, num_features)
     else:
@@ -137,4 +143,4 @@ for i in range(20):
 
     print(p, y)
 
-print(f'count = {count}')
+print(f'count = {count} / {num_total}')
